@@ -1,0 +1,157 @@
+---
+title: "thesis-sentiment"
+author: "Nick"
+date: "4/20/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+library(tidyverse)
+library(pdftools)
+library(tidytext)
+library(ggplot2)
+library(rvest)
+library(httr)
+library(pipeR) #(see https://renkun-ken.github.io/pipeR-tutorial/Pipe-operator/Pipe-for-side-effect.html)
+#library("svMisc") (for progress bar during reading files maybe..)
+```
+
+Query urls already prepared from the browser, ready to be read into R with rvest
+
+```{r urls, echo=TRUE}
+indbio_url <- "https://odr.chalmers.se/simple-search?location=%2F&query=&rpp=50&sort_by=dc.date.issued_dt&order=desc&filter_field_1=has_content_in_original_bundle&filter_type_1=equals&filter_value_1=true&filter_field_2=title&filter_type_2=notcontains&filter_value_2=och&filter_field_3=title&filter_type_3=notcontains&filter_value_3=hos&filter_field_4=title&filter_type_4=notcontains&filter_value_4=f%C3%B6r&filter_field_5=title&filter_type_5=notcontains&filter_value_5=av&filter_field_6=subject&filter_type_6=equals&filter_value_6=Industrial+Biotechnology"
+sysbio_url <- "https://odr.chalmers.se/simple-search?location=%2F&query=&rpp=50&sort_by=dc.date.issued_dt&order=desc&filter_field_1=has_content_in_original_bundle&filter_type_1=equals&filter_value_1=true&filter_field_2=title&filter_type_2=notcontains&filter_value_2=och&filter_field_3=title&filter_type_3=notcontains&filter_value_3=hos&filter_field_4=title&filter_type_4=notcontains&filter_value_4=f%C3%B6r&filter_field_5=title&filter_type_5=notcontains&filter_value_5=av&filter_field_6=subject&filter_type_6=equals&filter_value_6=Bioinformatics+and+Systems+Biology"
+food_url <- "https://odr.chalmers.se/simple-search?location=%2F&query=&rpp=60&sort_by=dc.date.issued_dt&order=desc&filter_field_1=has_content_in_original_bundle&filter_type_1=equals&filter_value_1=true&filter_field_2=title&filter_type_2=notcontains&filter_value_2=och&filter_field_3=title&filter_type_3=notcontains&filter_value_3=hos&filter_field_4=title&filter_type_4=notcontains&filter_value_4=f%C3%B6r&filter_field_5=title&filter_type_5=notcontains&filter_value_5=av&filter_field_6=subject&filter_type_6=equals&filter_value_6=Food+Science"
+kth_to_17_url <-   "http://kth.diva-portal.org/smash/resultList.jsf?query=&language=en&searchType=UNDERGRADUATE&noOfRows=50&sortOrder=relevance_sort_desc&sortOrder2=title_sort_asc&onlyFullText=false&sf=all&aq=%5B%5B%5D%5D&aqe=%5B%5D&aq2=%5B%5B%7B%22dateIssued%22%3A%7B%22from%22%3A%222015%22%2C%22to%22%3A%222020%22%7D%7D%2C%7B%22organisationId%22%3A%225903%22%2C%22organisationId-Xtra%22%3Atrue%7D%5D%5D&af=%5B%22hasFulltext%3Atrue%22%2C%22language%3Aeng%22%5D"
+kth_from_18_url <- "http://kth.diva-portal.org/smash/resultList.jsf?query=&language=en&searchType=UNDERGRADUATE&noOfRows=50&sortOrder=relevance_sort_desc&sortOrder2=title_sort_asc&onlyFullText=false&sf=all&aq=%5B%5B%5D%5D&aqe=%5B%5D&aq2=%5B%5B%7B%22organisationId%22%3A%22879224%22%2C%22organisationId-Xtra%22%3Atrue%7D%5D%5D&af=%5B%22personOrgId%3A879224%22%2C%22hasFulltext%3Atrue%22%2C%22language%3Aeng%22%2C%22categoryId%3A11500%22%2C%22categoryId%3A11528%22%5D"
+su_url <- "https://su.diva-portal.org/smash/resultList.jsf?dswid=61&af=%5B%22language%3Aeng%22%2C%22hasFulltext%3Atrue%22%2C%22thesisLevel%3AH2%22%5D&p=1&fs=true&language=en&searchType=UNDERGRADUATE&query=&aq=%5B%5B%5D%5D&aq2=%5B%5B%7B%22dateIssued%22%3A%7B%22from%22%3A%222015%22%2C%22to%22%3A%222020%22%7D%7D%2C%7B%22organisationId%22%3A%22535%22%2C%22organisationId-Xtra%22%3Atrue%7D%5D%5D&aqe=%5B%5D&noOfRows=50&sortOrder=relevance_sort_desc&sortOrder2=title_sort_asc&onlyFullText=false&sf=all"
+
+```
+
+Now the functions to read the metadata from ODR/Diva and download the pdf files programmatically.
+
+```{r}
+get_chalmersodr_thesis <- function(url){
+  #stopifnot(is.character(url) == TRUE)
+  url %>% 
+    read_html() %>%
+    {
+      tibble(year = html_nodes(., xpath = '//td[@headers="t1"]') %>% html_text(),
+            title = html_nodes(., xpath = '//td[@headers="t2"]') %>% html_text(),
+            author = html_nodes(., xpath = '//td[@headers="t3"]') %>% html_text(),
+            # xpath expression checkes for the string "handle" in all href attributes              and returns them 
+            id = html_nodes(., xpath = '//a[contains(@href,"handle")]/@href') %>%
+                  html_text() %>% 
+                  str_sub(-6),
+            group = str_sub(url, -22)
+            )
+    } %>% 
+    mutate(link = map_chr(uri, function(uri) {str_c("https://odr.chalmers.se/bitstream/20.500.12380/",
+                                   uri, "/1/", url, ".pdf", collapse = "")}
+                          ),
+           group = case_when(
+             str_detect(group, "Food") ~ "Food",
+             str_detect(group, "strial") ~ "IndBio",
+             str_detect(group, "Systems") ~ "SysBio")
+           )
+}
+```
+
+```{r}
+get_diva_thesis <- function(url){
+  stopifnot(is.character(url) == TRUE)
+  url %>% 
+    read_html() %>%
+    {
+      tibble(
+        title = html_nodes(., xpath = '//a[@class="titleLink singleRow linkcolor"]') %>% html_text(),
+        year = html_nodes(., xpath = '//a[@class="titleLink singleRow linkcolor"]//following-sibling::span[position() < 2]') %>% html_text(),
+        author= html_nodes(., xpath = '//div[@class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left toggleOrganisation"]') %>% html_text(),
+        link = html_nodes(., xpath = '//a[contains(@href,"get/diva2")]/@href') %>% html_text()
+      )
+    } %>% 
+    mutate(link = map_chr(link, function(link) {
+                                  ifelse(test = str_detect(url, "kth"),
+                                         yes = str_c("http://kth.diva-portal.org/smash/", link, collapse = ""),
+                                         no = str_c("http://su.diva-portal.org/smash/", link, collapse = ""))
+                                  }
+                  ),
+           id = str_extract(link, "\\d{6,7}"),
+           group = ifelse(str_detect(url, "kth"), "KTH", "SU")
+    )
+}
+```
+
+```{r}
+download_pdf <- function(link, id, group){
+  dest_folder <- str_c("./", group, "/", collapse = "")
+  if(!dir.exists(dest_folder))
+    dir.create(dest_folder)
+  
+  dest_file <- str_c(dest_folder, id, ".pdf", collapse = "")
+  if(!file.exists(dest_file)) {
+    sleep <- sample(2:8, 1)
+    print(paste("Pausing for ", sleep, "seconds"))
+    Sys.sleep(sleep)
+    download.file(link, destfile = dest_file)
+  }
+  else{
+    print("File already exists. . . ")
+    #Sys.sleep(2)
+  }
+}
+
+```
+
+Let's start by gathering some (meta)data on the thesis from their online repositories. Chalmers first
+
+```{r}
+chalmers_thesis <- map_dfr(c(indbio_url, sysbio_url, food_url) ,
+                     .f = get_chalmersodr_thesis) 
+```
+then KTH,
+```{r}
+kth_thesis <- map_dfr(c(kth_to_17_url, kth_from_18_url), .f = get_diva_thesis)
+```
+and last, SU
+```{r}
+su_thesis <- get_diva_thesis(su_url)
+```
+Since they all have the same columns we can can stack them all toghether in one tibble
+```{r}
+all_thesis <- bind_rows(chalmers_thesis, kth_thesis, su_thesis)
+```
+
+We can taka a look at what we have with some graphs:
+```{r}
+all_thesis %>% 
+  count(group, sort = TRUE) %>% 
+  mutate(group = reorder(group, n)) %>% 
+  ggplot(aes(group, n)) +
+  geom_col() +
+  coord_flip()
+
+all_thesis %>% 
+  group_by(group) %>% #filter(group == "KTH") %>% 
+  count(year)
+```
+
+
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
