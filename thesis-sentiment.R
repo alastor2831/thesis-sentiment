@@ -1,3 +1,5 @@
+
+# import packages ---------------------------------------------------------
 library(tidyverse)
 library(pdftools)
 library(tidytext)
@@ -8,12 +10,17 @@ library(pipeR) #(see https://renkun-ken.github.io/pipeR-tutorial/Pipe-operator/P
 #library("svMisc") (for progress bar during reading files maybe..)
 
 
+# url query vectors -------------------------------------------------------
+
 indbio_url <- "https://odr.chalmers.se/simple-search?location=%2F&query=&rpp=50&sort_by=dc.date.issued_dt&order=desc&filter_field_1=has_content_in_original_bundle&filter_type_1=equals&filter_value_1=true&filter_field_2=title&filter_type_2=notcontains&filter_value_2=och&filter_field_3=title&filter_type_3=notcontains&filter_value_3=hos&filter_field_4=title&filter_type_4=notcontains&filter_value_4=f%C3%B6r&filter_field_5=title&filter_type_5=notcontains&filter_value_5=av&filter_field_6=subject&filter_type_6=equals&filter_value_6=Industrial+Biotechnology"
 sysbio_url <- "https://odr.chalmers.se/simple-search?location=%2F&query=&rpp=50&sort_by=dc.date.issued_dt&order=desc&filter_field_1=has_content_in_original_bundle&filter_type_1=equals&filter_value_1=true&filter_field_2=title&filter_type_2=notcontains&filter_value_2=och&filter_field_3=title&filter_type_3=notcontains&filter_value_3=hos&filter_field_4=title&filter_type_4=notcontains&filter_value_4=f%C3%B6r&filter_field_5=title&filter_type_5=notcontains&filter_value_5=av&filter_field_6=subject&filter_type_6=equals&filter_value_6=Bioinformatics+and+Systems+Biology"
 food_url <- "https://odr.chalmers.se/simple-search?location=%2F&query=&rpp=60&sort_by=dc.date.issued_dt&order=desc&filter_field_1=has_content_in_original_bundle&filter_type_1=equals&filter_value_1=true&filter_field_2=title&filter_type_2=notcontains&filter_value_2=och&filter_field_3=title&filter_type_3=notcontains&filter_value_3=hos&filter_field_4=title&filter_type_4=notcontains&filter_value_4=f%C3%B6r&filter_field_5=title&filter_type_5=notcontains&filter_value_5=av&filter_field_6=subject&filter_type_6=equals&filter_value_6=Food+Science"
 kth_to_17_url <-   "http://kth.diva-portal.org/smash/resultList.jsf?query=&language=en&searchType=UNDERGRADUATE&noOfRows=50&sortOrder=relevance_sort_desc&sortOrder2=title_sort_asc&onlyFullText=false&sf=all&aq=%5B%5B%5D%5D&aqe=%5B%5D&aq2=%5B%5B%7B%22dateIssued%22%3A%7B%22from%22%3A%222015%22%2C%22to%22%3A%222020%22%7D%7D%2C%7B%22organisationId%22%3A%225903%22%2C%22organisationId-Xtra%22%3Atrue%7D%5D%5D&af=%5B%22hasFulltext%3Atrue%22%2C%22language%3Aeng%22%5D"
 kth_from_18_url <- "http://kth.diva-portal.org/smash/resultList.jsf?query=&language=en&searchType=UNDERGRADUATE&noOfRows=50&sortOrder=relevance_sort_desc&sortOrder2=title_sort_asc&onlyFullText=false&sf=all&aq=%5B%5B%5D%5D&aqe=%5B%5D&aq2=%5B%5B%7B%22organisationId%22%3A%22879224%22%2C%22organisationId-Xtra%22%3Atrue%7D%5D%5D&af=%5B%22personOrgId%3A879224%22%2C%22hasFulltext%3Atrue%22%2C%22language%3Aeng%22%2C%22categoryId%3A11500%22%2C%22categoryId%3A11528%22%5D"
 su_url <- "https://su.diva-portal.org/smash/resultList.jsf?dswid=61&af=%5B%22language%3Aeng%22%2C%22hasFulltext%3Atrue%22%2C%22thesisLevel%3AH2%22%5D&p=1&fs=true&language=en&searchType=UNDERGRADUATE&query=&aq=%5B%5B%5D%5D&aq2=%5B%5B%7B%22dateIssued%22%3A%7B%22from%22%3A%222015%22%2C%22to%22%3A%222020%22%7D%7D%2C%7B%22organisationId%22%3A%22535%22%2C%22organisationId-Xtra%22%3Atrue%7D%5D%5D&aqe=%5B%5D&noOfRows=50&sortOrder=relevance_sort_desc&sortOrder2=title_sort_asc&onlyFullText=false&sf=all"
+
+
+# custom function definitions ---------------------------------------------
 
 get_chalmersodr_thesis <- function(url){
   #stopifnot(is.character(url) == TRUE)
@@ -30,8 +37,8 @@ get_chalmersodr_thesis <- function(url){
             group = str_sub(url, -22)
             )
     } %>% 
-    mutate(link = map_chr(uri, function(uri) {str_c("https://odr.chalmers.se/bitstream/20.500.12380/",
-                                   uri, "/1/", uri, ".pdf", collapse = "")}
+    mutate(link = map_chr(id, function(id) {str_c("https://odr.chalmers.se/bitstream/20.500.12380/",
+                                  id, "/1/", id, ".pdf", collapse = "")}
                           ),
            group = case_when(
              str_detect(group, "Food") ~ "Food",
@@ -39,7 +46,6 @@ get_chalmersodr_thesis <- function(url){
              str_detect(group, "Systems") ~ "SysBio")
            )
 }
-
 get_diva_thesis <- function(url){
   stopifnot(is.character(url) == TRUE)
   url %>% 
@@ -62,9 +68,8 @@ get_diva_thesis <- function(url){
            group = ifelse(str_detect(url, "kth"), "KTH", "SU")
     )
 }
-
 download_pdf <- function(link, id, group){
-  dest_folder <- str_c("./", group, "/", collapse = "")
+  dest_folder <- str_c(getwd(), "/", group, "/", collapse = "")
   if(!dir.exists(dest_folder))
     dir.create(dest_folder)
   
@@ -80,52 +85,6 @@ download_pdf <- function(link, id, group){
     #Sys.sleep(2)
   }
 }
-
-
-# Let's start by gathering some (meta)data on the thesis from their online repositories. 
-# Chalmers first
-chalmers_thesis <- map_dfr(c(indbio_url, sysbio_url, food_url) ,
-                     .f = get_chalmersodr_thesis) 
-  
-# Then KTH
-kth_thesis <- map_dfr(c(kth_to_17_url, kth_from_18_url), .f = get_diva_thesis)
-
-# And last, SU
-su_thesis <- get_diva_thesis(su_url)
-
-# Since they all have the same columns we can can stack them all toghether in one tibble
-all_thesis <- bind_rows(chalmers_thesis, kth_thesis, su_thesis)
-
-all_thesis %>% 
-  count(group, sort = TRUE) %>% 
-  mutate(group = reorder(group, n)) %>% 
-  ggplot(aes(group, n)) +
-  geom_col() +
-  coord_flip()
-
-all_thesis %>% 
-  group_by(group) %>% #filter(group == "KTH") %>% 
-  count(year)
-
-
-
-
-# let's download the pdfs
-# To run a function on each row of a data frame we can simply use pmap which takes
-# a list as input and data frames in R are actually lists. This next chunk of code
-# calls download_pdf function on each row of the thesis data frame
-
-all_thesis_twenty %>% 
-  select(link, id, group) %>% 
-  # filter(between(1:103, 30,103)) %>% 
-  pmap(.f = download_pdf)
-
-# Now we can use pdftools package to read the thesis and get them into R, each as a 
-# character vector with length(n) where n = number of pages. We store them all in a list
-
-# Now we must read the pdf files and search for the acknowledgement section. We then split
-# by lines and save each thesis in its own tibble, preserving the id, linenumber and group 
-
 get_acknowledgement <- function(id, group){
   file_path <- str_c("./", group, "/", id, ".pdf")
   if(file.exists(file_path)){
@@ -142,10 +101,10 @@ get_acknowledgement <- function(id, group){
       #first get only pages with the Ack word in it, then the page with more numbers in it will be the
       #ToC so we save the index of the one with less numbers using which.min
       ack_index <- str_subset(temp_page, c("Acknowledgement|Foreword|ACKNOWLEDGEMENT|FOREWORD")) %>>%
-          str_count("[[:digit:]]") %>>%
-          (~print(paste0("Matches found: ", length(.)))) %>>%
-          which.min()
-        
+        str_count("[[:digit:]]") %>>%
+        (~print(paste0("Matches found: ", length(.)))) %>>%
+        which.min()
+      
       temp_page %>%
         str_subset(c("Acknowledgement|Foreword|ACKNOWLEDGEMENT|FOREWORD")) %>%
         `[`(ack_index) %>%
@@ -156,41 +115,141 @@ get_acknowledgement <- function(id, group){
                id = id,
                group = group) %>>%
         {invisible(.) %>% glimpse(.)}
-      } else {
-    print("No Acknowledgment section")
-    tibble(. = c("NO-SECTION"),
+    } else {
+      print("No Acknowledgment section")
+      tibble(. = c("NO-SECTION"),
+             line = 0,
+             id = id,
+             group = group)
+    }
+  }
+  else{
+    print(str_c("File", file_path, " not found"))
+    tibble(. = c("NO-FILE"),
            line = 0,
            id = id,
            group = group)
-      }
-    }
-    else(str_c("File", pdf, " not found"))
+  }
 }
 
 
-indbio_ack <- all_thesis %>% 
-  filter(group == "IndBio") %>% 
+# 1- getting the data -----------------------------------------------------
+
+# Let's start by gathering some (meta)data on the thesis from their online repositories. 
+# Chalmers first
+chalmers_thesis <- map_dfr(c(indbio_url, sysbio_url, food_url) ,
+                     .f = get_chalmersodr_thesis) 
+
+# Then KTH
+kth_thesis <- map_dfr(c(kth_to_17_url, kth_from_18_url), .f = get_diva_thesis)
+
+# And last, SU
+su_thesis <- get_diva_thesis(su_url)
+
+# Since they all have the same columns we can can stack them all toghether in one tibble
+all_thesis <- bind_rows(chalmers_thesis, kth_thesis, su_thesis)
+
+all_thesis %>% 
+  count(group, sort = TRUE) %>% 
+  mutate(group = reorder(group, n)) %>% 
+  ggplot(aes(group, n)) +
+  geom_col() +
+  coord_flip()
+
+all_thesis$link[1] %>% 
+  group_by(group) %>% #filter(group == "KTH") %>% 
+  count(year)
+
+# let's download the pdfs
+# To run a function on each row of a data frame we can simply use pmap which takes
+# a list as input and data frames in R are actually lists. This next chunk of code
+# calls download_pdf function on each row of the thesis data frame
+
+all_thesis %>%
+  #filter(group == "SysBio" | group == "IndBio" | group == "Food") %>% # edit here to download one group at the time
+  filter(group == "SU") %>% 
+  select(link, id, group) %>% 
+  pmap(.f = download_pdf) %>% 
+  invisible() # otherwise it would print an empty list for each file
+
+# Now we can want to extract the Acknowledgement page (if present) from each pdf to run the
+# sentiment analysis. With pdftools package we read the thesis into R as character vector,
+# one page for element. In get_acknowledgement function the paragraph is splitted by lines and
+# we return each section in its own tibble, preserving the id, linenumber and group, with
+# one row per line of text
+
+# Let's read them in several steps and then stack the tibbles together. First Chalmers
+
+chalmers_acknowledgements <- all_thesis %>% 
+  filter(group == "SysBio" | group == "IndBio" | group == "Food") %>% # edit here to read one group at the time
   select(id, group) %>% 
-  pmap(.f = get_tidy_acknowledgement) %>% 
+  pmap(.f = get_acknowledgement) %>% 
   bind_rows() %>% 
   `colnames<-`(c("text", "linenumber", "id", "group"))
 
-# Now let's read the KTH thesis
-kth_ack5 <- all_thesis %>% 
-  filter(group == "KTH") %>%
-  #slice() %>% 
+# Then KTH and SU
+kth_acknowledgements <- all_thesis %>% 
+  filter(group == "KTH") %>% # edit here to read one group at the time %>% 
+  filter(id != "1147632") %>% # this thesis is written in 2 columns layout and we ignore it
+  filter(id != "1295394") %>% # this one is too big to read so we ignore it too
   select(id, group) %>% 
-  pmap(.f = get_tidy_acknowledgement) %>% 
+  pmap(.f = get_acknowledgement) %>% 
   bind_rows() %>% 
   `colnames<-`(c("text", "linenumber", "id", "group"))
 
-kth_ack <- kth_ack %>% 
-  bind_rows(kth_ack2, kth_ack3, kth_ack4)
+su_acknowledgements <- all_thesis %>% 
+  filter(group == "SU") %>% # edit here to read one group at the time %>% 
+  select(id, group) %>% 
+  pmap(.f = get_acknowledgement) %>% 
+  bind_rows() %>% 
+  `colnames<-`(c("text", "linenumber", "id", "group"))
+
+
+all_acknowledgements <- bind_rows(chalmers_acknowledgements,
+                                  kth_acknowledgements,
+                                  su_acknowledgements) %>%
+  mutate(university = ifelse(group %in% c("SysBio", "IndBio","Food"),
+                                          "Chalmers", group)) 
+  
+# all_acknowledgements %>% 
+#   #select(id, group) %>% 
+#   group_by(group) %>% 
+#   distinct(id) %>% 
+#   count(group)
+
+with_ack <- all_acknowledgements %>% 
+  filter(text != "NO-SECTION") %>% 
+  group_by(group, university) %>%
+  distinct(id) %>% 
+  count(group, name = "with_ack")
+               
+ack_proportions <- all_thesis %>%
+  count(group, name = "total", sort = TRUE) %>% 
+  inner_join(with_ack) %>%
+  mutate(`%` = with_ack/total * 100)
+
+ack_proportions %>%
+  select(-c(`%`, university)) %>% 
+  melt(id.vars = c("group")) %>% 
+  ggplot(mapping = aes(x = group, y = value, fill = variable)) +
+  geom_col() +
+  coord_flip() +
+  scale_x_discrete(limits = c("KTH", "IndBio", "SU", "SysBio", "Food")) +
+  labs(title = "Proportion of thesis with(out) acnknowledgement section",
+       y = "n of thesis", x = "University/Group") +
+  scale_fill_discrete(name=" ",
+                      labels = c("without", "with")) +
+  theme_dark()
+
+
+all_acknowledgements %>% 
 
 
 
-
-# KTH 1147632 : double column layout, ack mixed with thesis 
+all_acknowledgements %>%
+  unnest_tokens(word, text, token = "words") %>% 
+  anti_join(stop_words)
+  
 
 kth_ack %>%
   bind_rows(indbio_ack) %>% 
@@ -210,24 +269,20 @@ indbio_tidy_ack <- indbio_ack %>%
   group_by(group) %>% 
   summarize(total = sum(present))
   
-  
-  unnest_tokens(word, text, token = "words")
-  
 
-
-read_thesis <- function(group, id){
-  file_path <- str_c("./", group, "/", id, ".pdf")
-  print(file_path)
-  if(file.exists(file_path)){
-    raw_file <- pdftools::pdf_text(file_path)
-    print(str_c("File ", id, " was read"))
-    
-    raw_splitted <- raw_file %>% str_split("\\n")
-    
-    map_dfr(.x = 1:length(raw_file), .f = function(x) {tibble(text = raw_splitted[[x]],
-                                                pagenumber = x,
-                                                linenumber = 1:length(raw_splitted[[x]]))}
-    )
+# read_thesis <- function(group, id){
+#   file_path <- str_c("./", group, "/", id, ".pdf")
+#   print(file_path)
+#   if(file.exists(file_path)){
+#     raw_file <- pdftools::pdf_text(file_path)
+#     print(str_c("File ", id, " was read"))
+# 
+#     raw_splitted <- raw_file %>% str_split("\\n")
+# 
+#     map_dfr(.x = 1:length(raw_file), .f = function(x) {tibble(text = raw_splitted[[x]],
+#                                                 pagenumber = x,
+#                                                 linenumber = 1:length(raw_splitted[[x]]))}
+#     )
     
 
 
