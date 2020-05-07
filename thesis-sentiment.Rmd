@@ -34,7 +34,7 @@ su_url <- "https://su.diva-portal.org/smash/resultList.jsf?dswid=61&af=%5B%22lan
 
 Now the functions to read the metadata from ODR/Diva and download the pdf files programmatically.
 
-```{r}
+```{r functions}
 get_chalmersodr_thesis <- function(url){
   #stopifnot(is.character(url) == TRUE)
   url %>% 
@@ -50,8 +50,8 @@ get_chalmersodr_thesis <- function(url){
             group = str_sub(url, -22)
             )
     } %>% 
-    mutate(link = map_chr(uri, function(uri) {str_c("https://odr.chalmers.se/bitstream/20.500.12380/",
-                                   uri, "/1/", url, ".pdf", collapse = "")}
+    mutate(link = map_chr(url, function(url) {str_c("https://odr.chalmers.se/bitstream/20.500.12380/",
+                                   url, "/1/", url, ".pdf", collapse = "")}
                           ),
            group = case_when(
              str_detect(group, "Food") ~ "Food",
@@ -59,9 +59,7 @@ get_chalmersodr_thesis <- function(url){
              str_detect(group, "Systems") ~ "SysBio")
            )
 }
-```
 
-```{r}
 get_diva_thesis <- function(url){
   stopifnot(is.character(url) == TRUE)
   url %>% 
@@ -84,9 +82,7 @@ get_diva_thesis <- function(url){
            group = ifelse(str_detect(url, "kth"), "KTH", "SU")
     )
 }
-```
 
-```{r}
 download_pdf <- function(link, id, group){
   dest_folder <- str_c("./", group, "/", collapse = "")
   if(!dir.exists(dest_folder))
@@ -104,7 +100,6 @@ download_pdf <- function(link, id, group){
     #Sys.sleep(2)
   }
 }
-
 ```
 
 Let's start by gathering some (meta)data on the thesis from their online repositories. Chalmers first
